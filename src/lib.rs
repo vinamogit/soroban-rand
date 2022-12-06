@@ -32,7 +32,6 @@ impl SorobanRng {
         // ((timestamp * sequence) + (h+l)) * nonce
         let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into());
 
-
         SorobanRng {
             rng: Rng::seed_from_u64(state)
         }
