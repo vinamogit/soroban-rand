@@ -1,0 +1,12 @@
+[package]
+name = "soroban-rand"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+soroban-sdk="0.2.1"
+rand = { version = "0.8.5", default-features = false, features=["small_rng"] }
+
+[dev_dependencies]
+soroban-sdk = { version = "0.2.1", features = ["testutils"] }
