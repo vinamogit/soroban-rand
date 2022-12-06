@@ -11,7 +11,7 @@ pub struct SorobanRng {
 }
 
 impl SorobanRng {
-    pub fn init(e: Env) -> SorobanRng {
+    pub fn init_with_salt(e: Env, salt: u32) -> SorobanRng {
 
         // Seed from the contract deployment context
         let contract_id = e.current_contract().to_array();
@@ -30,11 +30,15 @@ impl SorobanRng {
         
         // Maybe a better formula can be found
         // ((timestamp * sequence) + (h+l)) * nonce
-        let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into());
+        let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into()).wrapping_add(salt.into());
 
         SorobanRng {
             rng: Rng::seed_from_u64(state)
         }
+    }
+
+    pub fn init(e: Env) -> SorobanRng {
+        Self::init_with_salt(e, 0)
     }
 }
 
@@ -65,7 +69,7 @@ mod tests {
 
         use crate::SorobanRng;
 
-        use rand::Rng;
+        use rand::{Rng, RngCore};
 
         pub struct RandomTest;
 
@@ -74,6 +78,13 @@ mod tests {
             pub fn random(env: Env, max: u32) -> u32 {
 
                 let mut rng = SorobanRng::init(env);
+                rng.gen_range(0..max)
+            }
+
+            pub fn rnd_salt(env: Env, max: u32) -> u32 {
+                let mut rng = SorobanRng::init(env.clone());
+                rng = SorobanRng::init_with_salt(env, rng.next_u32());
+
                 rng.gen_range(0..max)
             }
         }
@@ -102,6 +113,25 @@ mod tests {
             let r = rolling_dice.random(&10);
 
             println!("Random max 10: {r}");
+    }
+
+    #[test]
+    fn test_with_salt() {
+        
+            let env = Env::default();
+    
+            env.ledger().set(testutils::LedgerInfo {
+                protocol_version: 0,
+                sequence_number: 0,
+                timestamp: std::time::SystemTime::now().duration_since(UNIX_EPOCH).expect("Time flies").as_secs(),
+                network_passphrase: [0u8].to_vec(),
+                base_reserve: 0,
+            });
+            let contract_id = env.register_contract(None, contract::RandomTest);
+            let rolling_dice =  RandomTestClient::new(&env, contract_id);
+            let r = rolling_dice.rnd_salt(&100);
+
+            println!("Random max 100 with salt: {r}");
     }
     
     #[test]
