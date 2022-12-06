@@ -11,7 +11,6 @@ pub struct RollingDice;
 #[contractimpl]
 impl RollingDice {
     
-    
     pub fn roll(env: Env, max: u32) -> u32 {
 
         let mut rng = SorobanRng::init(env);

@@ -22,6 +22,9 @@ impl SorobanRng {
         // Seed from the contract execution context
         let nonce: u32 = e.data().get(SOROBAN_RAND_KEY).unwrap_or(Ok(1)).unwrap();
 
+        // Update the nonce
+        e.data().set(SOROBAN_RAND_KEY, nonce+1);
+
         // Seed from the ledger context
         let time = e.ledger().timestamp().wrapping_mul(e.ledger().sequence() as u64);
         
@@ -29,7 +32,6 @@ impl SorobanRng {
         // ((timestamp * sequence) + (h+l)) * nonce
         let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into());
 
-        e.data().set(SOROBAN_RAND_KEY, nonce+1);
 
         SorobanRng {
             rng: Rng::seed_from_u64(state)
