@@ -12,11 +12,10 @@ pub struct RollingDice;
 impl RollingDice {
     
     
-    pub fn roll(env: Env) -> u32 {
+    pub fn roll(env: Env, max: u32) -> u32 {
 
         let mut rng = SorobanRng::init(env);
-        rng.gen_range(0..6)
+        rng.gen_range(0..max)
     }
-
 }
 

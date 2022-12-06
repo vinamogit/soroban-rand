@@ -2,7 +2,9 @@
 use rand::{Error, RngCore, SeedableRng};
 
 use rand::rngs::SmallRng as Rng;
-use soroban_sdk::Env;
+use soroban_sdk::{Env, symbol, Symbol};
+
+const SOROBAN_RAND_KEY: Symbol = symbol!("SOROBANRND");
 
 pub struct SorobanRng {
     rng: Rng,
@@ -11,12 +13,26 @@ pub struct SorobanRng {
 impl SorobanRng {
     pub fn init(e: Env) -> SorobanRng {
 
-        // Maybe find a better seed
-        // let h: [u8; 8] = e.current_contract().to_array().split_at(8).0.try_into().expect("Contract ID too short");
-        // let state: u64 = e.ledger().timestamp()  * u64::from_le_bytes(h);
-        let state: u64 = e.ledger().timestamp().wrapping_mul(e.ledger().sequence() as u64);
+        // Seed from the contract deployment context
+        let contract_id = e.current_contract().to_array();
+        let h: [u8; 8] = contract_id.split_at(8).0.try_into().expect("msg");
+        let l: [u8; 8] = contract_id.split_at(24).1.try_into().expect("msg");
+        let sum: u64 = u64::from_be_bytes(h).wrapping_add(u64::from_be_bytes(l));
+
+        // Seed from the contract execution context
+        let nonce: u32 = e.data().get(SOROBAN_RAND_KEY).unwrap_or(Ok(1)).unwrap();
+
+        // Seed from the ledger context
+        let time = e.ledger().timestamp().wrapping_mul(e.ledger().sequence() as u64);
+        
+        // Maybe a better formula can be found
+        // ((timestamp * sequence) + (h+l)) * nonce
+        let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into());
+
+        e.data().set(SOROBAN_RAND_KEY, nonce+1);
+
         SorobanRng {
-            rng: Rng::seed_from_u64(state as u64),
+            rng: Rng::seed_from_u64(state)
         }
     }
 }
@@ -43,39 +59,48 @@ impl RngCore for SorobanRng {
 
 #[cfg(test)]
 mod tests {
+    mod contract {
+        use soroban_sdk::{contractimpl, Env};
+
+        use crate::SorobanRng;
+
+        use rand::Rng;
+
+        pub struct RandomTest;
+
+        #[contractimpl]
+        impl RandomTest {
+            pub fn random(env: Env, max: u32) -> u32 {
+
+                let mut rng = SorobanRng::init(env);
+                rng.gen_range(0..max)
+            }
+        }
+    }
     extern crate std;
     use std::{println, time::UNIX_EPOCH};
 
-    use rand::{RngCore, Rng, rngs::SmallRng};
     use soroban_sdk::{Env, testutils::{Ledger, self}};
 
-    use crate::SorobanRng;
+    use crate::{tests::contract::RandomTestClient};
 
     #[test]
     fn test() {
-        let env = Env::default();
-
-        env.ledger().set(testutils::LedgerInfo {
-            protocol_version: 0,
-            sequence_number: 0,
-            timestamp: std::time::SystemTime::now().duration_since(UNIX_EPOCH).expect("Time flies").as_secs(),
-            network_passphrase: [0u8].to_vec(),
-            base_reserve: 0,
-        });
-
-        let mut rng = SorobanRng::init(env);
-
         
-        let len = 1000000;
-        let mut dist: [i32; 10] = [0; 10];
-        for _i in 1..len {
-            dist[rng.gen_range(0..dist.len())] += 1;
-        }
+            let env = Env::default();
+    
+            env.ledger().set(testutils::LedgerInfo {
+                protocol_version: 0,
+                sequence_number: 0,
+                timestamp: std::time::SystemTime::now().duration_since(UNIX_EPOCH).expect("Time flies").as_secs(),
+                network_passphrase: [0u8].to_vec(),
+                base_reserve: 0,
+            });
+            let contract_id = env.register_contract(None, contract::RandomTest);
+            let rolling_dice =  RandomTestClient::new(&env, contract_id);
+            let r = rolling_dice.random(&10);
 
-        for n in dist {
-            println!("{n}");
-            assert!(n > 99000);
-        }        
+            println!("Random max 10: {r}");
     }
     
     #[test]
@@ -91,18 +116,11 @@ mod tests {
             base_reserve: 0,
         });
 
-        let mut rng = SorobanRng::init(env);
+        let contract_id = env.register_contract(None, contract::RandomTest);
+            let rolling_dice =  RandomTestClient::new(&env, contract_id);
+            let r = rolling_dice.random(&100);
 
-        let len = 1000000;
-        let mut dist: [i32; 10] = [0; 10];
-        for _i in 1..len {
-            dist[rng.gen_range(0..dist.len())] += 1;
-        }
-
-        for n in dist {
-            println!("{n}");
-            assert!(n > 99000);
-        }   
+            println!("Random max 100: {r}");
         
     }
     #[test]
@@ -118,18 +136,11 @@ mod tests {
             base_reserve: 0,
         });
 
-        let mut rng = SorobanRng::init(env);
+        let contract_id = env.register_contract(None, contract::RandomTest);
+            let rolling_dice =  RandomTestClient::new(&env, contract_id);
+            let r = rolling_dice.random(&1000);
 
-        let len = 1000000;
-        let mut dist: [i32; 10] = [0; 10];
-        for _i in 1..len {
-            dist[rng.gen_range(0..dist.len())] += 1;
-        }
-
-        for n in dist {
-            println!("{n}");
-            assert!(n > 99000);
-        }   
+            println!("Random max 1000: {r}");
         
     }
 }
