@@ -20,14 +20,14 @@ impl SorobanRng {
         let sum: u64 = u64::from_be_bytes(h).wrapping_add(u64::from_be_bytes(l));
 
         // Seed from the contract execution context
-        let nonce: u32 = e.data().get(SOROBAN_RAND_KEY).unwrap_or(Ok(1)).unwrap();
+        let nonce: u32 = e.storage().get(SOROBAN_RAND_KEY).unwrap_or_else(||Ok(1)).unwrap();
 
         // Update the nonce
-        e.data().set(SOROBAN_RAND_KEY, nonce+1);
+        e.storage().set(SOROBAN_RAND_KEY, nonce+1);
 
         // Seed from the ledger context
         let time = e.ledger().timestamp().wrapping_mul(e.ledger().sequence() as u64);
-        
+
         // Maybe a better formula can be found
         // ((timestamp * sequence) + (h+l)) * nonce
         let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into()).wrapping_add(salt.into());
@@ -98,9 +98,9 @@ mod tests {
 
     #[test]
     fn test() {
-        
+
             let env = Env::default();
-    
+
             env.ledger().set(testutils::LedgerInfo {
                 protocol_version: 0,
                 sequence_number: 0,
@@ -117,9 +117,9 @@ mod tests {
 
     #[test]
     fn test_with_salt() {
-        
+
             let env = Env::default();
-    
+
             env.ledger().set(testutils::LedgerInfo {
                 protocol_version: 0,
                 sequence_number: 0,
@@ -133,7 +133,7 @@ mod tests {
 
             println!("Random max 100 with salt: {r}");
     }
-    
+
     #[test]
     fn test_limit_sequence() {
         let env = Env::default();
@@ -152,7 +152,7 @@ mod tests {
             let r = rolling_dice.random(&100);
 
             println!("Random max 100: {r}");
-        
+
     }
     #[test]
     fn test_limit_all() {
@@ -172,6 +172,6 @@ mod tests {
             let r = rolling_dice.random(&1000);
 
             println!("Random max 1000: {r}");
-        
+
     }
 }
