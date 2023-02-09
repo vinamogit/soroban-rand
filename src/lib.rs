@@ -32,13 +32,17 @@ impl SorobanRng {
         // ((timestamp * sequence) + (h+l)) * nonce
         let state: u64 = sum.wrapping_add(time).wrapping_mul(nonce.into()).wrapping_add(salt.into());
 
-        SorobanRng {
-            rng: Rng::seed_from_u64(state)
-        }
+        Self::init_rng(state)
     }
 
     pub fn init(e: Env) -> SorobanRng {
         Self::init_with_salt(e, 0)
+    }
+
+    pub fn init_rng(seed: u64) -> SorobanRng {
+        SorobanRng {
+            rng: Rng::seed_from_u64(seed)
+        }
     }
 }
 
